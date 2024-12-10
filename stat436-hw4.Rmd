@@ -1,0 +1,105 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r}
+library(tidyverse)    # For data manipulation and plotting
+library(randomForest) # For Random Forest model
+library(caret)        # For train-test split and evaluation
+library(viridis)      # For beautiful color scales
+
+```
+
+```{r}
+# Load the wine dataset
+wine_data <- read.csv("https://raw.githubusercontent.com/mjkozlow/stat439-hw4/refs/heads/main/WineQT.csv")
+wine_data
+
+# Remove the ID column
+wine_data <- wine_data %>% select(-Id)
+
+# Train-test split
+set.seed(123) # For reproducibility
+train_index <- createDataPartition(wine_data$quality, p = 0.8, list = FALSE)
+train_data <- wine_data[train_index, ] # Training data
+test_data <- wine_data[-train_index, ] # Testing data
+
+```
+
+```{r}
+# Train the Random Forest model
+rf_model <- randomForest(as.factor(quality) ~ ., data = train_data, ntree = 100, importance = TRUE)
+
+# Print model summary
+print(rf_model)
+
+# Predict on test data
+predictions <- predict(rf_model, test_data)
+
+# Confusion matrix and accuracy
+conf_matrix <- confusionMatrix(predictions, as.factor(test_data$quality))
+print(conf_matrix)
+cat("Model Accuracy:", conf_matrix$overall['Accuracy'], "\n")
+
+```
+
+```{r}
+# Calculate feature importance
+importance_data <- data.frame(
+  Feature = rownames(importance(rf_model)),
+  Importance = importance(rf_model)[, "MeanDecreaseGini"]
+)
+
+# Plot feature importance
+ggplot(importance_data, aes(x = reorder(Feature, Importance), y = Importance, fill = Importance)) +
+  geom_bar(stat = "identity", color = "white") +
+  scale_fill_viridis(
+    option = "magma",
+    name = "Importance",
+    direction = -1
+  ) +
+  coord_flip() +
+  labs(
+    title = "Feature Importance (Random Forest)",
+    x = "Features",
+    y = "Importance"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.y = element_text(size = 12),
+    axis.text.x = element_text(size = 10)
+  )
+
+```
+
+
+```{r}
+# Generate confusion matrix
+conf_matrix <- confusionMatrix(predictions, as.factor(test_data$quality))
+
+# Extract confusion matrix as a data frame
+conf_matrix_df <- as.data.frame(conf_matrix$table)
+
+# Plot confusion matrix heatmap
+ggplot(conf_matrix_df, aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis(option = "magma", name = "Frequency") +
+  labs(
+    title = "Confusion Matrix Heatmap",
+    x = "Actual Quality",
+    y = "Predicted Quality"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+```
+
